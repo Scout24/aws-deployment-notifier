@@ -44,7 +44,7 @@ ami_id = arguments["AMI_ID"]
 
 try:
     Notifier(sns_topic_arn=sns_topic_arn, stack_name=stack_name, ami_id=ami_id).publish()
-    Receiver(queue_name=queue_name, queue_account=queue_account, stack_name=stack_name).poll()
+    Receiver(queue_name=queue_name, queue_account=queue_account, stack_name=stack_name).wait_for_deployment_result()
 except Exception as e:
     logger.exception(e)
     sys.exit(1)

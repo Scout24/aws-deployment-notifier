@@ -68,40 +68,42 @@ class Receiver(object):
             result[key] = value.strip("'")
         return result
 
-    def poll(self, start_time=pytz.UTC.localize(datetime.datetime.utcnow())):
-        first_run = True
+    def wait_for_deployment_result(self, start_time=None):
+        start_time = start_time or pytz.UTC.localize(datetime.datetime.utcnow())
 
         while True:
-            if not first_run:
-                time.sleep(1)
+            if self.is_done(start_time):
+                break
 
-            first_run = False
-            messages = self.sqs_queue.get_messages()
-            self.logger.debug("Got messages: {0}".format(len(messages)))
+            time.sleep(1)
 
-            for message in messages:
-                self.logger.info("Processing message id: {0}".format(message.id))
-                body = self.get_body(message)
+    def is_done(self, start_time):
+        messages = self.sqs_queue.get_messages()
+        self.logger.debug("Got messages: {0}".format(len(messages)))
 
-                message_timestamp = datetime.datetime(
-                    *time.strptime(body['Timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")[0:6], tzinfo=pytz.utc)
-                message_data = self.get_cloudformation_message_data(body)
-                resource_status = message_data['ResourceStatus']
-                stack_name = message_data['StackName']
-                self.logger.debug(
-                    "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp, stack_name, resource_status))
+        for message in messages:
+            self.logger.info("Processing message id: {0}".format(message.id))
+            body = self.get_body(message)
 
-                if stack_name == self.stack_name:
-                    message.delete()
+            message_timestamp = datetime.datetime(
+                *time.strptime(body['Timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")[0:6], tzinfo=pytz.utc)
+            message_data = self.get_cloudformation_message_data(body)
+            resource_status = message_data['ResourceStatus']
+            stack_name = message_data['StackName']
+            self.logger.debug(
+                "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp, stack_name, resource_status))
 
-                    if message_timestamp < start_time:
-                        self.logger.info("Discarding stale event: {0}".format(body))
-                    else:
-                        self.logger.info('CloudFormation stack is in state {0}'.format(resource_status))
+            if stack_name == self.stack_name:
+                message.delete()
 
-                        if resource_status in VALID_RESOURCE_STATES:
-                            self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}".format(stack_name, message_timestamp, message_data['ResourceStatusReason']))
-                            return
-                        elif resource_status.startswith("UPDATE_ROLLBACK"):
-                            raise Exception("Update failed: {0}".format(message_data['ResourceStatusReason']))
+                if message_timestamp < start_time:
+                    self.logger.info("Discarding stale event: {0}".format(body))
+                else:
+                    self.logger.info('CloudFormation stack is in state {0}'.format(resource_status))
+
+                    if resource_status in VALID_RESOURCE_STATES:
+                        self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}".format(stack_name, message_timestamp, message_data['ResourceStatusReason']))
+                        return True
+                    elif resource_status.startswith("UPDATE_ROLLBACK"):
+                        raise Exception("Update failed: {0}".format(message_data['ResourceStatusReason']))
 
