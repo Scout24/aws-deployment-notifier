@@ -15,7 +15,8 @@ name = 'aws-deployment-notifier'
 version = '0.0.1'
 summary = 'AWS Deployment Notifier - Automate your Stack Updates!'
 description = """tbd."""
-authors = [Author('Jan Brennenstuhl', 'jan@brennenstuhl.me')]
+authors = [Author('Jan Brennenstuhl', 'jan@brennenstuhl.me'),
+           Author('Konrad Hosemann', 'konrad@hosemann.name')]
 url = 'https://github.com/ImmobilienScout24/aws-deployment-notifier'
 license = 'Apache License 2.0'
 
@@ -26,6 +27,7 @@ def set_properties(project):
 
     project.depends_on("docopt")
     project.depends_on("boto")
+    project.depends_on("pytz")
 
     project.build_depends_on("mock")
 

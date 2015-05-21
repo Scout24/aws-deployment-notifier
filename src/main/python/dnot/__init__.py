@@ -12,13 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import boto
+import time
 import logging
 import json
-from boto import sqs, sns
+import datetime
 
-VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'CREATION_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE', 'ROLLBACK_COMPLETE']
+import boto
+from boto import sqs, sns
+import pytz
+
+VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
 
 
 class Notifier(object):
@@ -33,38 +36,72 @@ class Notifier(object):
     def publish(self):
         self.sns_connection.publish(topic=self.sns_topic_arn, message=json.dumps(
             {'AmiId': self.ami_id, 'StackName': self.stack_name}))
+        self.logger.info("Published stack update notification for: {0} with ami id: {1}".format(self.stack_name, self.ami_id))
 
 
 class Receiver(object):
-    def __init__(self, region='eu-west-1', sqs_queue_arn=None, stack_name=None):
+    def __init__(self, queue_name, queue_account, stack_name, region='eu-west-1',):
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
         self.stack_name = stack_name
         self.sqs_connection = boto.sqs.connect_to_region(region)
-        self.sqs_queue = self.sqs_connection.get_queue(sqs_queue_arn)
+        self.sqs_queue = self.sqs_connection.get_queue(queue_name=queue_name, owner_acct_id=queue_account)
+        if not self.sqs_queue:
+            raise Exception("Unable to find SQS queue for name: {0} in account: {1}".format(queue_name, queue_account))
 
     def delete_message(self, message):
         self.logger.info('Deleting Message')
         self.sqs_connection.delete_message(self.sqs_queue, message)
 
-    def process_message(self, message):
-        json_data = json.loads(message.get_body())
-        message_data = json_data['Message'].rstrip()
-        pairs = message_data.splitlines()
-        return dict(pair.split('=') for pair in pairs)
+    def get_cloudformation_message_data(self, body):
+        message_data = body['Message'].rstrip()
+        lines = message_data.splitlines()
+        return self.strip_quotes_from_values(dict(line.split('=') for line in lines if '=' in line))
 
-    def poll(self):
-        received_corresponding_message = False
-        
-        while not received_corresponding_message:
-            try:
-                messages = self.sqs_queue.get_messages()
-                for message in messages:
-                    message_data = self.process_message(message)
-                    stack_name = message_data['StackName'].strip('\'')
-                    resource_status = message_data['ResourceStatus'].strip('\'')
-                    if stack_name is self.stack_name and resource_status in VALID_RESOURCE_STATES:
+    def get_body(self, message):
+        data = json.loads(message.get_body())
+        return self.strip_quotes_from_values(data)
+
+    def strip_quotes_from_values(self, dictionary):
+        result = {}
+        for key, value in dictionary.items():
+            result[key] = value.strip("'")
+        return result
+
+    def poll(self, start_time=pytz.UTC.localize(datetime.datetime.utcnow())):
+        first_run = True
+
+        while True:
+            if not first_run:
+                time.sleep(1)
+
+            first_run = False
+            messages = self.sqs_queue.get_messages()
+            self.logger.debug("Got messages: {0}".format(len(messages)))
+
+            for message in messages:
+                self.logger.info("Processing message id: {0}".format(message.id))
+                body = self.get_body(message)
+
+                message_timestamp = datetime.datetime(
+                    *time.strptime(body['Timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")[0:6], tzinfo=pytz.utc)
+                message_data = self.get_cloudformation_message_data(body)
+                resource_status = message_data['ResourceStatus']
+                stack_name = message_data['StackName']
+                self.logger.debug(
+                    "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp, stack_name, resource_status))
+
+                if stack_name == self.stack_name:
+                    message.delete()
+
+                    if message_timestamp < start_time:
+                        self.logger.info("Discarding stale event: {0}".format(body))
+                    else:
                         self.logger.info('CloudFormation stack is in state {0}'.format(resource_status))
-                        message.delete()
-                        received_corresponding_message = True
-            except Exception, e:
-                self.logger.exception(e)
+
+                        if resource_status in VALID_RESOURCE_STATES:
+                            self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}".format(stack_name, message_timestamp, message_data['ResourceStatusReason']))
+                            return
+                        elif resource_status.startswith("UPDATE_ROLLBACK"):
+                            raise Exception("Update failed: {0}".format(message_data['ResourceStatusReason']))
+
