@@ -35,7 +35,8 @@ class Notifier(object):
 
     def publish(self):
         self.sns_connection.publish(topic=self.sns_topic_arn, message=json.dumps(
-            {'AmiId': self.ami_id, 'StackName': self.stack_name}))
+            {'StackName': self.stack_name, 'Parameters': [{ 'amiId': self.ami_id }]})
+        )
         self.logger.info("Published stack update notification for: {0} with ami id: {1}".format(self.stack_name, self.ami_id))
 
 
@@ -54,13 +55,21 @@ class Receiver(object):
         self.sqs_connection.delete_message(self.sqs_queue, message)
 
     def get_cloudformation_message_data(self, body):
-        message_data = body['Message'].rstrip()
-        lines = message_data.splitlines()
-        return self.strip_quotes_from_values(dict(line.split('=') for line in lines if '=' in line))
+        try:
+            message_data = body['Message'].rstrip()
+            lines = message_data.splitlines()
+            return self.strip_quotes_from_values(dict(line.split('=') for line in lines if '=' in line))
+        except Exception as e:
+            self.logger.exception("Error parsing cloudformation message data: {0}".format(body), e)
+            raise e
 
     def get_body(self, message):
-        data = json.loads(message.get_body())
-        return self.strip_quotes_from_values(data)
+        try:
+            data = json.loads(message.get_body())
+            return self.strip_quotes_from_values(data)
+        except Exception as e:
+            self.logger.exception("Error parsing message: {0}".format(message), e)
+            raise e
 
     def strip_quotes_from_values(self, dictionary):
         result = {}
