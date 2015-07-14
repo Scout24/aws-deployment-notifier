@@ -25,19 +25,16 @@ VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
 
 
 class Notifier(object):
-    def __init__(self, region='eu-west-1', sns_topic_arn=None, stack_name=None, ami_id=None):
+    def __init__(self, sns_region='eu-west-1'):
         self.logger = logging.getLogger(__name__)
-        self.region = region
-        self.sns_topic_arn = sns_topic_arn
-        self.stack_name = stack_name
-        self.ami_id = ami_id
-        self.sns_connection = boto.sns.connect_to_region('eu-west-1')
+        self.sns_connection = boto.sns.connect_to_region(sns_region)
 
-    def publish(self):
-        self.sns_connection.publish(topic=self.sns_topic_arn, message=json.dumps(
-            {'StackName': self.stack_name, 'Parameters': [{ 'amiId': self.ami_id }]})
+    def publish(self, sns_topic_arn, stack_name, params, region="eu-west-1"):
+        self.sns_connection.publish(topic=sns_topic_arn, message=json.dumps(
+            {'stackName': stack_name, 'region': region, 'params': json.loads(params)})
         )
-        self.logger.info("Published stack update notification for: {0} with ami id: {1}".format(self.stack_name, self.ami_id))
+        self.logger.info("Published stack update notification for: {0} with params: {1}"
+                         .format(stack_name, params))
 
 
 class Receiver(object):
@@ -48,7 +45,8 @@ class Receiver(object):
         self.sqs_connection = boto.sqs.connect_to_region(region)
         self.sqs_queue = self.sqs_connection.get_queue(queue_name=queue_name, owner_acct_id=queue_account)
         if not self.sqs_queue:
-            raise Exception("Unable to find SQS queue for name: {0} in account: {1}".format(queue_name, queue_account))
+            raise Exception("Unable to find SQS queue for name: {0} in account: {1}"
+                            .format(queue_name, queue_account))
 
     def delete_message(self, message):
         self.logger.info('Deleting Message')
@@ -100,7 +98,8 @@ class Receiver(object):
             resource_status = message_data['ResourceStatus']
             stack_name = message_data['StackName']
             self.logger.debug(
-                "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp, stack_name, resource_status))
+                "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp,
+                                                                             stack_name, resource_status))
 
             if stack_name == self.stack_name:
                 message.delete()
@@ -111,8 +110,9 @@ class Receiver(object):
                     self.logger.info('CloudFormation stack is in state {0}'.format(resource_status))
 
                     if resource_status in VALID_RESOURCE_STATES:
-                        self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}".format(stack_name, message_timestamp, message_data['ResourceStatusReason']))
+                        self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}"
+                                         .format(stack_name, message_timestamp,
+                                                 message_data['ResourceStatusReason']))
                         return True
                     elif resource_status.startswith("UPDATE_ROLLBACK"):
                         raise Exception("Update failed: {0}".format(message_data['ResourceStatusReason']))
-

@@ -1,3 +1,4 @@
+import sys
 from pybuilder.core import use_plugin, init, Author
 
 use_plugin('python.core')
@@ -28,6 +29,7 @@ def set_properties(project):
     project.depends_on("docopt")
     project.depends_on("boto")
     project.depends_on("pytz")
+    project.depends_on("unittest2")
 
     project.build_depends_on("mock")
 

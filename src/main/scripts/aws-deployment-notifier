@@ -19,7 +19,16 @@ Use to trigger update for STACK_NAME with AMI_ID.
 Publishes deployment message on SNS topic and waits for corresponding result message on SQS queue.
 
 Usage:
-    aws-deploy SNS_ARN QUEUE_NAME QUEUE_ACCOUNT STACK_NAME AMI_ID
+    aws-deployment-notifier [options] -t SNS_ARN -q QUEUE_NAME -a ACCOUNT -s STACK_NAME -p PARAMS_JSON
+
+    -t SNS_ARN      ARN of the SNS topic to send update messages to
+    -q QUEUE_NAME   Name of the SQS queue where stack update events are pulled from
+    -a ACCOUNT      Account number of the target account
+    -s STACK_NAME   Name of the stack to update
+    -p PARAMS_JSON  Stack parameters in JSON format
+
+Options:
+    --stack-region
 
 """
 
@@ -39,11 +48,12 @@ sns_topic_arn = arguments["SNS_ARN"]
 queue_name = arguments["QUEUE_NAME"]
 queue_account = arguments["QUEUE_ACCOUNT"]
 stack_name = arguments["STACK_NAME"]
-ami_id = arguments["AMI_ID"]
+region = arguments["REGION"]
+params = arguments["PARAMS_AS_JSON"]
 
 
 try:
-    Notifier(sns_topic_arn=sns_topic_arn, stack_name=stack_name, ami_id=ami_id).publish()
+    Notifier(sns_region=region).publish(sns_topic_arn=sns_topic_arn, stack_name=stack_name, params=params)
     Receiver(queue_name=queue_name, queue_account=queue_account, stack_name=stack_name).wait_for_deployment_result()
 except Exception as e:
     logger.exception(e)
