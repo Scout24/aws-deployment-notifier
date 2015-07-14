@@ -29,9 +29,9 @@ class Notifier(object):
         self.logger = logging.getLogger(__name__)
         self.sns_connection = boto.sns.connect_to_region(sns_region)
 
-    def publish(self, sns_topic_arn, stack_name, params, region="eu-west-1"):
+    def publish(self, sns_topic_arn, stack_name, params, result_topic, region="eu-west-1"):
         self.sns_connection.publish(topic=sns_topic_arn, message=json.dumps(
-            {'stackName': stack_name, 'region': region, 'params': json.loads(params)})
+            {'stackName': stack_name, 'region': region, 'notificationARN': result_topic, 'params': json.loads(params)})
         )
         self.logger.info("Published stack update notification for: {0} with params: {1}"
                          .format(stack_name, params))
@@ -89,7 +89,7 @@ class Receiver(object):
         self.logger.debug("Got messages: {0}".format(len(messages)))
 
         for message in messages:
-            self.logger.info("Processing message id: {0}".format(message.id))
+            self.logger.info("Processing message id: {0} msg: {1}".format(message.id, vars(message)))
             body = self.get_body(message)
 
             message_timestamp = datetime.datetime(
