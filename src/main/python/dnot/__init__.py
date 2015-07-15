@@ -53,21 +53,14 @@ class Receiver(object):
         self.sqs_connection.delete_message(self.sqs_queue, message)
 
     def get_cloudformation_message_data(self, body):
-        try:
-            message_data = body['Message'].rstrip()
-            lines = message_data.splitlines()
-            return self.strip_quotes_from_values(dict(line.split('=') for line in lines if '=' in line))
-        except Exception as e:
-            self.logger.exception("Error parsing cloudformation message data: {0}".format(body), e)
-            raise e
+        message_data = body['Message'].rstrip()
+        lines = message_data.splitlines()
+        return self.strip_quotes_from_values(dict(line.split("='") for line in lines if "='" in line))
 
     def get_body(self, message):
-        try:
-            data = json.loads(message.get_body())
-            return self.strip_quotes_from_values(data)
-        except Exception as e:
-            self.logger.exception("Error parsing message: {0}".format(message), e)
-            raise e
+        data = json.loads(message.get_body())
+        return self.strip_quotes_from_values(data)
+
 
     def strip_quotes_from_values(self, dictionary):
         result = {}
@@ -102,7 +95,7 @@ class Receiver(object):
                                                                              stack_name, resource_status))
 
             if stack_name == self.stack_name:
-                message.delete()
+                #message.delete()
 
                 if message_timestamp < start_time:
                     self.logger.info("Discarding stale event: {0}".format(body))
