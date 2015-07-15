@@ -95,7 +95,7 @@ class Receiver(object):
                                                                              stack_name, resource_status))
 
             if stack_name == self.stack_name:
-                #message.delete()
+                message.delete()
 
                 if message_timestamp < start_time:
                     self.logger.info("Discarding stale event: {0}".format(body))
