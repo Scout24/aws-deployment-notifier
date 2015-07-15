@@ -23,15 +23,15 @@ Usage:
     aws-deployment-notifier [-d] [-t SNS_ARN] [-q QUEUE_NAME] [-a ACCOUNT] [-s STACK_NAME] [-r SNS_REGION] [-p PARAMS_JSON] [-b RESULT_TOPIC_ARN] [--stack-region=STACK_REGION]
 
 Options:
-    -t SNS_ARN      ARN of the SNS topic to send update messages to
-    -q QUEUE_NAME   Name of the SQS queue where stack update events are pulled from
-    -a ACCOUNT      Account number of the target account
-    -s STACK_NAME   Name of the stack to update
-    -r REGION       Region of the stack updater [default: eu-west-1]
-    -p PARAMS_JSON  Stack parameters in JSON format
-    -b RESULT_TOPIC_ARN The Cloudformation Result Topic
+    -t SNS_ARN          ARN of the SNS topic to send update messages to
+    -q QUEUE_NAME       Name of the SQS queue where stack update events are pulled from
+    -a ACCOUNT          Account number of the target account
+    -s STACK_NAME       Name of the stack to update
+    -r REGION           Region of the stack updater [default: eu-west-1]
+    -p PARAMS_JSON      Stack parameters in JSON format
+    -b RESULT_TOPIC_ARN The CloudFormation Result Topic
 
-    -d              debug output
+    -d                  debug output
 
     --stack-region=STACK_REGION     Region where the stack is located, defaults to REGION
 
