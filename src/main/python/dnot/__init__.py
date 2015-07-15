@@ -40,17 +40,12 @@ class Notifier(object):
 class Receiver(object):
     def __init__(self, queue_name, queue_account, stack_name, region='eu-west-1',):
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
         self.stack_name = stack_name
         self.sqs_connection = boto.sqs.connect_to_region(region)
         self.sqs_queue = self.sqs_connection.get_queue(queue_name=queue_name, owner_acct_id=queue_account)
         if not self.sqs_queue:
             raise Exception("Unable to find SQS queue for name: {0} in account: {1}"
                             .format(queue_name, queue_account))
-
-    def delete_message(self, message):
-        self.logger.info('Deleting Message')
-        self.sqs_connection.delete_message(self.sqs_queue, message)
 
     def get_cloudformation_message_data(self, body):
         message_data = body['Message'].rstrip()
@@ -79,10 +74,10 @@ class Receiver(object):
 
     def is_done(self, start_time):
         messages = self.sqs_queue.get_messages()
-        self.logger.debug("Got messages: {0}".format(len(messages)))
+        self.logger.info("Got messages: {0}".format(len(messages)))
 
         for message in messages:
-            self.logger.info("Processing message id: {0} msg: {1}".format(message.id, vars(message)))
+            self.logger.debug("Processing message {0}".format(vars(message)))
             body = self.get_body(message)
 
             message_timestamp = datetime.datetime(
@@ -90,19 +85,19 @@ class Receiver(object):
             message_data = self.get_cloudformation_message_data(body)
             resource_status = message_data['ResourceStatus']
             stack_name = message_data['StackName']
-            self.logger.debug(
-                "At (UTC): {0} stack name: {1}, resource status: {2}".format(message_timestamp,
-                                                                             stack_name, resource_status))
+            resource_type = message_data['ResourceType']
 
             if stack_name == self.stack_name:
                 message.delete()
 
                 if message_timestamp < start_time:
-                    self.logger.info("Discarding stale event: {0}".format(body))
+                    self.logger.debug("Discarding stale event: {0}".format(body))
                 else:
-                    self.logger.info('CloudFormation stack is in state {0}'.format(resource_status))
+                    self.logger.info(
+                        "At (UTC): {0} stack name: {1}, resource status: {2} for resource type: {3}"
+                            .format(message_timestamp, stack_name, resource_status, resource_type))
 
-                    if resource_status in VALID_RESOURCE_STATES:
+                    if resource_status in VALID_RESOURCE_STATES and resource_type == "AWS::CloudFormation::Stack":
                         self.logger.info("Update of stack: {0} succeeded at (UTC) {1}: {2}"
                                          .format(stack_name, message_timestamp,
                                                  message_data['ResourceStatusReason']))

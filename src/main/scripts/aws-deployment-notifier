@@ -20,7 +20,7 @@ Use to trigger update for STACK_NAME with arbitrary parameter.
 Publishes deployment message on SNS topic and waits for corresponding result message on SQS queue.
 
 Usage:
-    aws-deployment-notifier [-t SNS_ARN] [-q QUEUE_NAME] [-a ACCOUNT] [-s STACK_NAME] [-r SNS_REGION] [-p PARAMS_JSON] [-b RESULT_TOPIC_ARN] [--stack-region=STACK_REGION]
+    aws-deployment-notifier [-d] [-t SNS_ARN] [-q QUEUE_NAME] [-a ACCOUNT] [-s STACK_NAME] [-r SNS_REGION] [-p PARAMS_JSON] [-b RESULT_TOPIC_ARN] [--stack-region=STACK_REGION]
 
 Options:
     -t SNS_ARN      ARN of the SNS topic to send update messages to
@@ -30,6 +30,8 @@ Options:
     -r REGION       Region of the stack updater [default: eu-west-1]
     -p PARAMS_JSON  Stack parameters in JSON format
     -b RESULT_TOPIC_ARN The Cloudformation Result Topic
+
+    -d              debug output
 
     --stack-region=STACK_REGION     Region where the stack is located, defaults to REGION
 
@@ -42,13 +44,8 @@ from docopt import docopt
 
 from dnot import Notifier, Receiver
 
-logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%Y-%m-%dT%H:%M:%S', level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 arguments = docopt(__doc__)
-
 sns_topic_arn = arguments["-t"]
-
 queue_name = arguments["-q"]
 queue_account = arguments["-a"]
 stack_name = arguments["-s"]
@@ -56,8 +53,12 @@ region = arguments["-r"]
 stackRegion = arguments["--stack-region"] if "--stack-region" in arguments else region
 params = arguments["-p"]
 result_topic = arguments["-b"]
+log_level = logging.DEBUG if arguments["-d"] else logging.INFO
 
-print params
+logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%Y-%m-%dT%H:%M:%S', level=log_level)
+logger = logging.getLogger(__name__)
+
+logger.debug("arguments: {0}".format(arguments))
 
 try:
     Notifier(sns_region=region).publish(sns_topic_arn=sns_topic_arn, stack_name=stack_name, params=params, region=stackRegion, result_topic=result_topic)
