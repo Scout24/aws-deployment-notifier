@@ -1,4 +1,5 @@
 import sys
+
 from pybuilder.core import use_plugin, init, Author
 
 use_plugin('python.core')
@@ -31,7 +32,11 @@ def set_properties(project):
     project.depends_on("pytz")
     project.depends_on("unittest2")
 
-    project.build_depends_on("mock<1.1")
+    mock_version = "mock"
+    if sys.version_info < (2, 7):
+        mock_version += "<1.1"
+
+    project.build_depends_on(mock_version)
 
     project.set_property("flake8_include_test_sources", True)
     project.set_property('coverage_break_build', False)
