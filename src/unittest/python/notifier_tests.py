@@ -1,3 +1,4 @@
+import json
 import dnot
 from mock import patch
 import unittest2
@@ -16,9 +17,9 @@ class NotifierTest(unittest2.TestCase):
         notifier.publish(sns_topic_arn=topic, stack_name=stack_name, result_topic=result_topic, params=params)
 
         connect_to_region_mock.assert_called_with(region)
+
+        message = json.loads('{{"stackName": "{0}", "notificationARN": "{1}", "region": "eu-west-1", "params": {2}}}'
+            .format(stack_name, result_topic, params))
         connect_to_region_mock.return_value.publish.assert_called_with(
             topic=topic,
-            message='{{"stackName": "{0}", "notificationARN": "{1}", "region": "eu-west-1", "params": {2}}}'.format(
-                stack_name,
-                result_topic,
-                params))
+            message=json.dumps(message))
