@@ -18,7 +18,6 @@ import json
 import datetime
 
 import boto
-from boto import sqs, sns
 import pytz
 
 VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
@@ -55,7 +54,6 @@ class Receiver(object):
     def get_body(self, message):
         data = json.loads(message.get_body())
         return self.strip_quotes_from_values(data)
-
 
     def strip_quotes_from_values(self, dictionary):
         result = {}
