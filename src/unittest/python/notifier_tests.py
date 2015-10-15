@@ -5,7 +5,7 @@ import unittest2
 
 
 class NotifierTest(unittest2.TestCase):
-    @patch("dnot.boto.sns.connect_to_region")
+    @patch("dnot.sns.connect_to_region")
     def test_parameters_are_submitted(self, connect_to_region_mock):
         topic = "abc"
         region = "eu-west-2"

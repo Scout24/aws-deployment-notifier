@@ -17,8 +17,7 @@ import logging
 import json
 import datetime
 
-import boto
-from boto import sqs, sns
+from boto import sns, sqs
 import pytz
 
 VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
@@ -27,7 +26,7 @@ VALID_RESOURCE_STATES = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
 class Notifier(object):
     def __init__(self, sns_region='eu-west-1'):
         self.logger = logging.getLogger(__name__)
-        self.sns_connection = boto.sns.connect_to_region(sns_region)
+        self.sns_connection = sns.connect_to_region(sns_region)
 
     def publish(self, sns_topic_arn, stack_name, params, result_topic, region="eu-west-1"):
         self.sns_connection.publish(topic=sns_topic_arn, message=json.dumps(
@@ -41,7 +40,7 @@ class Receiver(object):
     def __init__(self, queue_name, queue_account, stack_name, region='eu-west-1',):
         self.logger = logging.getLogger(__name__)
         self.stack_name = stack_name
-        self.sqs_connection = boto.sqs.connect_to_region(region)
+        self.sqs_connection = sqs.connect_to_region(region)
         self.sqs_queue = self.sqs_connection.get_queue(queue_name=queue_name, owner_acct_id=queue_account)
         if not self.sqs_queue:
             raise Exception("Unable to find SQS queue for name: {0} in account: {1}"
@@ -55,7 +54,6 @@ class Receiver(object):
     def get_body(self, message):
         data = json.loads(message.get_body())
         return self.strip_quotes_from_values(data)
-
 
     def strip_quotes_from_values(self, dictionary):
         result = {}
